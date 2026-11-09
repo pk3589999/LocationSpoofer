@@ -1,0 +1,57 @@
+name: Build Tweak
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Theos
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xz-utils rsync
+          # 老 toolchain 需要 libtinfo.so.5（带 NCURSES_TINFO_5 版本符号），Ubuntu 24.04 已移除，装 22.04 的真包
+          sudo curl -sL http://archive.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.3_amd64.deb -o /tmp/libtinfo5.deb
+          sudo dpkg -i /tmp/libtinfo5.deb
+          # ldid（伪签名工具）
+          sudo curl -sL https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_linux_x86_64 -o /usr/local/bin/ldid
+          sudo chmod +x /usr/local/bin/ldid
+          # Theos 本体
+          git clone --recursive https://github.com/theos/theos.git $HOME/theos
+          # iOS SDK —— v10 工具链只认 tbd v3，11.4 SDK 是最后的老格式版本
+          mkdir -p $HOME/theos/sdks
+          git clone --depth 1 https://github.com/theos/sdks.git /tmp/sdks
+          mv /tmp/sdks/iPhoneOS11.4.sdk $HOME/theos/sdks/
+          rm -rf /tmp/sdks
+          # Linux 版 iOS 交叉编译工具链
+          mkdir -p $HOME/theos/toolchain/linux/iphone
+          curl -sL https://github.com/sbingner/llvm-project/releases/download/v10.0.0-1/linux-ios-arm64e-clang-toolchain.tar.lzma -o /tmp/tc.tar.lzma
+          mkdir -p /tmp/tc
+          tar -xf /tmp/tc.tar.lzma -C /tmp/tc
+          top=$(ls -A /tmp/tc | head -1)
+          if [ "$(ls -A /tmp/tc | wc -l)" -eq 1 ] && [ -d "/tmp/tc/$top" ]; then
+            cp -a "/tmp/tc/$top/." $HOME/theos/toolchain/linux/iphone/
+          else
+            cp -a /tmp/tc/. $HOME/theos/toolchain/linux/iphone/
+          fi
+          rm -rf /tmp/tc /tmp/tc.tar.lzma
+          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+          echo "$HOME/theos/bin" >> $GITHUB_PATH
+
+      - name: Build package
+        run: |
+          export THEOS=$HOME/theos
+          make clean || true
+          make package FINALPACKAGE=1
+
+      - name: Upload deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: LocationSpoofer-deb
+          path: packages/*.deb
+          if-no-files-found: error

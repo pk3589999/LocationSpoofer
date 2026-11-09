@@ -1,0 +1,8 @@
+# 强制保持 LF：Makefile 和 build.yml 里带 CRLF 会让云端(make/bash)编译直接失败
+* text=auto eol=lf
+*.xm text eol=lf
+Makefile text eol=lf
+control text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.plist text eol=lf
