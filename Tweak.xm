@@ -304,7 +304,17 @@ static void LSPatchSourceInformation(void) {
 
         LSLoadPrefs(YES);
         LSPatchSourceInformation();
-        NSLog(@"[LocationSpoofer] v1.3.0 loaded, enabled=%d lat=%.6f lon=%.6f jitter=%.1fm",
+
+        // v1.3.1 诊断：在承载进程的临时目录留一个加载标记，
+        // 便于远程（SSH/AFC）确认插件到底有没有注入成功。
+        @try {
+            NSString *marker = [NSTemporaryDirectory() stringByAppendingPathComponent:@"ls_loaded.txt"];
+            NSString *info = [NSString stringWithFormat:@"v1.3.1 bid=%@ enabled=%d lat=%.6f lon=%.6f",
+                              bid ?: @"?", gEnabled, gLat, gLon];
+            [info writeToFile:marker atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        } @catch (NSException *e) {}
+
+        NSLog(@"[LocationSpoofer] v1.3.1 loaded, enabled=%d lat=%.6f lon=%.6f jitter=%.1fm",
               gEnabled, gLat, gLon, gJitter);
     }
 }
